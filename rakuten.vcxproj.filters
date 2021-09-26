@@ -1,0 +1,98 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{D9D6E242-F8AF-46E4-B9FD-80ECBC20BA3E}</UniqueIdentifier>
+      <Extensions>qrc;*</Extensions>
+      <ParseFiles>false</ParseFiles>
+    </Filter>
+    <Filter Include="client">
+      <UniqueIdentifier>{e6c1d1f6-da87-47cf-b861-f23cccf63dd4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ui">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="etc">
+      <UniqueIdentifier>{1b9711b7-d2b0-411d-b8ca-ff156669e91f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="model">
+      <UniqueIdentifier>{a1bf5702-e46d-40b8-be1f-cb94b9c698e2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="test">
+      <UniqueIdentifier>{bfb2789a-5625-4fce-b1f7-b698188fd628}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <QtRcc Include="rakuten.qrc">
+      <Filter>Resource Files</Filter>
+    </QtRcc>
+    <QtUic Include="rakuten.ui">
+      <Filter>Resource Files</Filter>
+    </QtUic>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="RakutenItemModel.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="rakuten_client.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
+    <ClCompile Include="MainWindow.cpp">
+      <Filter>ui</Filter>
+    </ClCompile>
+    <ClCompile Include="gen.cpp">
+      <Filter>etc</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>etc</Filter>
+    </ClCompile>
+    <ClCompile Include="qt_helper.cpp">
+      <Filter>etc</Filter>
+    </ClCompile>
+    <ClCompile Include="stdafx.cpp">
+      <Filter>etc</Filter>
+    </ClCompile>
+    <ClCompile Include="ftp.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
+    <ClCompile Include="test.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <QtMoc Include="MainWindow.hpp">
+      <Filter>ui</Filter>
+    </QtMoc>
+    <QtMoc Include="RakutenItemModel.hpp">
+      <Filter>model</Filter>
+    </QtMoc>
+    <QtMoc Include="rakuten_client.hpp">
+      <Filter>client</Filter>
+    </QtMoc>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="stdafx.h">
+      <Filter>etc</Filter>
+    </ClInclude>
+    <ClInclude Include="qt_helper.hpp">
+      <Filter>etc</Filter>
+    </ClInclude>
+    <ClInclude Include="settings.hpp">
+      <Filter>etc</Filter>
+    </ClInclude>
+    <ClInclude Include="ftp.hpp">
+      <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="ControlledWebPage.hpp">
+      <Filter>ui</Filter>
+    </ClInclude>
+    <ClInclude Include="test.hpp">
+      <Filter>test</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
