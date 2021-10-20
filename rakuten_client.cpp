@@ -10,6 +10,7 @@ rakuten_client::rakuten_client(RakutenItemModel* model, QObject* parent)
 	: m_model(model), QNetworkAccessManager(parent)
 {
 	// ItemAPIへのリクエストは、1秒に1リクエストまでを目安にアクセスしてください。
+	// ※ トラフィックが集中した場合には、トラフィック制限をかけさせていただく場合がございます。
 	this->m_searchTimerId = this->startTimer(1200);
 
 	// 本APIへのリクエストは、1秒に1リクエストまでを目安にアクセスしてください。
@@ -62,6 +63,8 @@ void rakuten_client::timerEvent(QTimerEvent* e)
 		{
 			const auto pair = m_payOrderAPIRequests.dequeue();
 			QNetworkReply* reply = this->post(pair.first, pair.second);
+			this->m_replyBuffers[reply] = QByteArray();
+
 			QObject::connect(reply, &QNetworkReply::errorOccurred, this, [reply](QNetworkReply::NetworkError e)
 			{
 				qWarning() << "errorOccurred" << reply->url() << e;
@@ -72,7 +75,28 @@ void rakuten_client::timerEvent(QTimerEvent* e)
 }
 
 
-void rakuten_client::searchOrder(struct searchOrder_param& param)
+void rakuten_client::license_get()
+{
+	// https://webservice.rms.rakuten.co.jp/merchant-portal/view/ja/common/1-1_service_index/licensemanagementapi/licenseexpirydateget/
+	QUrlQuery query;
+	query.addQueryItem("licenseKey", this->m_licenseKey);
+
+	QUrl request_url("https://api.rms.rakuten.co.jp/es/1.0/license-management/license-key/expiry-date");
+	request_url.setQuery(query);
+
+	QNetworkRequest request(request_url);
+	request.setSslConfiguration(QSslConfiguration::defaultConfiguration());
+	request.setRawHeader("Authorization", this->gen_rakuten_auth());
+	request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json; charset=utf-8");
+
+	// reply
+	QNetworkReply* reply = this->get(request);
+	this->m_replyBuffers[reply] = QByteArray();
+	QObject::connect(reply, &QNetworkReply::finished, this, &rakuten_client::licenseExpiryDateFinished);
+}
+
+
+void rakuten_client::queue_searchOrder(struct searchOrder_param& param)
 {
 	QNetworkRequest request(QUrl("https://api.rms.rakuten.co.jp/es/2.0/order/searchOrder/"));
 	request.setSslConfiguration(QSslConfiguration::defaultConfiguration());
@@ -80,10 +104,10 @@ void rakuten_client::searchOrder(struct searchOrder_param& param)
 	request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json; charset=utf-8");
 	this->m_payOrderAPIRequests.enqueue(qMakePair(request, param.toByteArray()));
 }
-void rakuten_client::searchOrder()
+void rakuten_client::queue_searchOrder()
 {
 	searchOrder_param req;
-	this->searchOrder(req);
+	this->queue_searchOrder(req);
 }
 
 void rakuten_client::queue_getOrder(const getOrder_param& param)
@@ -165,6 +189,7 @@ void rakuten_client::item_search(const QString& itemUrl)
 
 	// reply
 	QNetworkReply* reply = this->get(request);
+	this->m_replyBuffers[reply] = QByteArray();
 	QObject::connect(reply, &QNetworkReply::finished, this, &rakuten_client::item_search_finished);
 }
 void rakuten_client::queue_item_search(const QString& itemUrl, bool force)
@@ -176,22 +201,27 @@ void rakuten_client::queue_item_search(const QString& itemUrl, bool force)
 		return;
 	}
 
-	// use cache if exists
+	// notify queue
+	emit this->queuedItemSearch(1);
+
 	if (!force && this->m_model->contains(this->m_shopCode, itemUrl))
 	{
-		qDebug() << itemUrl << "cache found";
+		// use cache if exists
 		emit this->signal_itemSearchFinished(itemUrl);
-		return;
+		qDebug() << itemUrl << "cache found";
 	}
-
-	// queue otherwise
-	this->m_item_search_queue.enqueue(itemUrl);
-	qDebug() << "queue item.search" << itemUrl << "count: " << this->m_item_search_queue.count();
+	else
+	{
+		// queue otherwise
+		this->m_item_search_queue.enqueue(itemUrl);
+		qDebug() << "queued item.search" << itemUrl;
+	}
 }
 
 
-void rakuten_client::IchibaItem_Search(int page)
+bool rakuten_client::IchibaItem_Search(int page)
 {
+	// https://webservice.rakuten.co.jp/api/ichibaitemsearch/
 	QUrlQuery query;
 	query.addQueryItem("applicationId", this->m_applicationId);
 	query.addQueryItem("format", "json");
@@ -210,7 +240,10 @@ void rakuten_client::IchibaItem_Search(int page)
 
 	// reply
 	QNetworkReply* reply = this->get(request);
+	this->m_replyBuffers[reply] = QByteArray();
 	QObject::connect(reply, &QNetworkReply::finished, this, &rakuten_client::IchibaItem_Search_finished);
+
+	return true;
 }
 
 
@@ -233,7 +266,6 @@ void rakuten_client::onSearchOrder(QNetworkReply* reply)
 		case 503:
 		{
 			// expected error
-			qDebug() << reply->readAll();
 			ok = false;
 			break;
 		}
@@ -282,6 +314,7 @@ void rakuten_client::onSearchOrder(QNetworkReply* reply)
 			_local_set.insert(num);
 		}
 		this->m_orderNumberList.merge(_local_set);
+		qDebug() << "m_orderNumberList.size" << m_orderNumberList.size();
 
 		emit this->signal_searchOrderFinished(true);
 	}
@@ -368,40 +401,9 @@ void rakuten_client::onGetOrder(QNetworkReply * reply)
 		const QJsonArray OrderModelList = obj["OrderModelList"].toArray();
 		for (const QJsonValue& _order : OrderModelList)
 		{
-			QVector<QSharedPointer<getOrder_resp>> orderedItems;
-			const QJsonObject order = _order.toObject();
-			const QString orderNumber = order["orderNumber"].toString();
-			const QJsonArray PackageModelList = order["PackageModelList"].toArray();
-			for (const QJsonValue& _package : PackageModelList)
-			{
-				const QJsonObject package = _package.toObject();
-				const QJsonArray ItemModelList = package["ItemModelList"].toArray();
-				for (const QJsonValue& _item : ItemModelList)
-				{
-					const QJsonObject item = _item.toObject();
-
-					QSharedPointer<getOrder_resp> resp = QSharedPointer<getOrder_resp>::create();
-					resp->orderNumber = orderNumber;
-
-					// YYYY-MM-DDThh:mm:ss+09:00
-					resp->orderDatetime = QDateTime::fromString(order["orderDatetime"].toString(), Qt::ISODate);
-
-					resp->itemName = item["itemName"].toString();
-					resp->itemId = item["itemId"].toInt();
-					resp->itemNumber = item["itemNumber"].toString(); // this can be null
-					resp->manageNumber = item["manageNumber"].toString();
-					resp->price = item["price"].toInt();
-					resp->units = item["units"].toInt();
-
-					orderedItems.push_back(std::move(resp));
-				}
-			}
-
-			for (const QSharedPointer<getOrder_resp> item : orderedItems)
-			{
-				this->queue_item_search(item->manageNumber);
-			}
-			this->m_model->insertOrder(orderNumber, std::move(orderedItems));
+			const QJsonObject json_obj = _order.toObject();
+			auto order = QSharedPointer<rpay::getOrder::OrderModel>::create(json_obj);
+			this->m_model->insertOrder(order->orderNumber, std::move(order));
 		}
 
 		emit this->signal_getOrderFinished(true);
@@ -423,6 +425,7 @@ void rakuten_client::onGetOrder(QNetworkReply * reply)
 void rakuten_client::IchibaItem_Search_finished()
 {
 	QNetworkReply* reply = qobject_cast<QNetworkReply*>(this->sender());
+	this->m_replyBuffers.remove(reply);
 	reply->deleteLater();
 
 	if (reply->error() != QNetworkReply::NoError)
@@ -442,6 +445,12 @@ void rakuten_client::IchibaItem_Search_finished()
 	// 総ページ数(最大100)
 	const int pageCount = obj["pageCount"].toInt();
 	const int last = obj["last"].toInt();
+
+	//
+	if (page == 1)
+	{
+		this->m_ichiba_items.clear();
+	}
 
 	for (const auto& _item : obj["Items"].toArray())
 	{
@@ -485,35 +494,97 @@ void rakuten_client::IchibaItem_Search_finished()
 }
 
 
+void rakuten_client::licenseExpiryDateFinished()
+{
+	QNetworkReply* reply = qobject_cast<QNetworkReply*>(this->sender());
+	this->m_replyBuffers.remove(reply);
+	reply->deleteLater();
+
+	const int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+	const QByteArray data = reply->readAll();
+	if (data.isEmpty())
+	{
+		// network error or smth
+		return;
+	}
+
+	const QJsonObject obj = QJsonDocument::fromJson(data).object();
+	if (obj.contains("errors"))
+	{
+		const QJsonArray errors = obj["errors"].toArray(); // always not null
+		for (const QJsonValue& v : errors)
+		{
+			const QJsonObject error = v.toObject();
+			const QString type = error["code"].toString();
+			const QString code = error["message"].toString();
+		}
+	}
+	else
+	{
+		const QString expiryDate = obj["expiryDate"].toString();
+	}
+
+
+#ifdef _DEBUG
+	const QString filename = global_dir.filePath("license.expiryDate.get.json");
+	QFile f_out(filename);
+	if (f_out.open(QIODevice::WriteOnly))
+	{
+		f_out.write(data);
+		f_out.flush();
+	}
+#endif
+}
+
+
 void rakuten_client::item_search_finished()
 {
 	QNetworkReply* reply = qobject_cast<QNetworkReply*>(this->sender());
+	this->m_replyBuffers.remove(reply);
 	reply->deleteLater();
 
+	//
+	const QUrlQuery query(reply->url());
+	const QString itemUrl = query.queryItemValue("itemUrl");
+
+	const QByteArray responseBody = reply->readAll();
+	const APIResponseStatus status(responseBody);
 	if (reply->error() != QNetworkReply::NoError)
+	{
+		if (status.isNG())
+		{
+			emit this->signal_itemAPIFinished(status);
+		}
+		else
+		{
+			// network error or smth
+		}
+
+		qWarning() << reply->url() << "failed.";
 		return;
+	}
 
 	QDomDocument doc;
-	doc.setContent(reply->readAll());
+	doc.setContent(responseBody);
 	const QDomNodeList items = doc.documentElement().elementsByTagName("item");
 	if (items.isEmpty())
 	{
-		QUrlQuery query(reply->url());
-		const QString itemUrl = query.queryItemValue("itemUrl");
-		qDebug() << "item.search" << itemUrl << "failed";
 		if (!itemUrl.isEmpty())
 		{
 			this->m_itemSearchFails.insert(itemUrl);
 			emit this->signal_itemSearchFinished(itemUrl);
 		}
-		return;
-	}
 
-	for (int i = 0; i < items.count(); i++)
+		qWarning() << "item.search" << itemUrl << "failed";
+	}
+	else
 	{
-		QJsonObject json;
-		xml_to_json(items.item(i), json);
-		this->m_model->addItem(this->m_shopCode, json);
+		for (int i = 0; i < items.count(); i++)
+		{
+			item::search::item_ptr item = item::search::item_ptr::create(items.at(i));
+			this->m_model->addItem(this->m_shopCode, item);
+			emit this->signal_itemSearchFinished(item->itemUrl);
+		}
 	}
 }
 
@@ -532,5 +603,6 @@ void rakuten_client::payOrderAPIFinished()
 	}
 
 	// delete later
+	this->m_replyBuffers.remove(reply);
 	reply->deleteLater();
 }

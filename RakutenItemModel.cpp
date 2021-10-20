@@ -6,23 +6,6 @@
 #include "settings.hpp"
 
 
-QSharedPointer<rakuten_item> item_from_obj(QSharedPointer<rakuten_item> item, const QJsonObject& obj)
-{
-	item->itemUrl = obj.value("itemUrl").toString();
-	item->itemNumber = obj.value("itemNumber").toString();
-	item->itemName = obj.value("itemName").toString();
-	item->itemPrice = obj.value("itemPrice").toString().toInt();
-	item->genreId = obj.value("genreId").toString().toInt();
-	item->registDate = QDateTime::fromString(obj.value("registDate").toString(), Qt::ISODateWithMs);
-	item->images.clear();
-	for (const auto& v : obj.value("images").toObject())
-	{
-		item->images.push_back(v.toString());
-	}
-	return item;
-}
-
-
 RakutenItemModel::RakutenItemModel(QObject* parent) : QAbstractTableModel(parent)
 {
 }
@@ -44,7 +27,7 @@ QVariant RakutenItemModel::data(const QModelIndex& index, int role) const
 	if (index.row() >= this->m_items.size())
 		return QVariant();
 
-	const auto& item = this->m_items[index.row()];
+	const auto item = this->m_items[index.row()];
 	if (role == Qt::DisplayRole)
 	{
 		switch (index.column())
@@ -67,17 +50,12 @@ QVariant RakutenItemModel::data(const QModelIndex& index, int role) const
 	{
 		if (index.column() == 0)
 		{
-			/*if (item.detail.loaded)
-				return QIcon(":/images/icons8-checked-48.png");
-			else if (item.search.loaded)
-				return QIcon(":/images/icons8-loading-48.png");*/
 			return QIcon();
 		}
 	}
 	else if (role == Qt::TextColorRole)
 	{
-		/*if (item._error)
-			return QBrush(Qt::red);*/
+		// textcolor
 	}
 	else if (role == LinkRole)
 	{
@@ -98,32 +76,6 @@ QVariant RakutenItemModel::data(const QModelIndex& index, int role) const
 	else if (role == CodeRole)
 	{
 		return item->itemUrl;
-	}
-	else if (role == SoldoutRole)
-	{
-		//return item.search.item.soldout;
-	}
-	else if (role == PriceRole)
-	{
-		//return item.search.item.price;
-	}
-	else if (role == TitleRole)
-	{
-		//return item.search.item.title;
-	}
-
-	// runtime
-	else if (role == NewRole)
-	{
-		//return item._new;
-	}
-	else if (role == ChangedRole)
-	{
-		//return item._changed;
-	}
-	else if (role == ErrorRole)
-	{
-		//return item._error;
 	}
 
 	return QVariant();
@@ -153,107 +105,134 @@ QVariant RakutenItemModel::headerData(int section, Qt::Orientation orientation, 
 void RakutenItemModel::save(const QDir& dir)
 {
 	// orders
-	QSettings settings(dir.filePath("orders.ini"), QSettings::IniFormat);
-	for (auto it = this->m_orders.begin(); it != this->m_orders.end(); ++it)
 	{
-		settings.beginGroup(it.key());
-		settings.beginWriteArray("orders");
-		const auto& vec = it.value();
-		for (int i = 0; i < vec.size(); i++)
+		QFile f_out(dir.filePath(ORDERS_FILE_NAME));
+		if (!f_out.open(QIODevice::WriteOnly))
 		{
-			settings.setArrayIndex(i);
-			vec[i]->serialize(settings);
-		}
-		settings.endArray();
-		settings.endGroup();
-	}
-
-
-	// shop items
-	QJsonObject obj;
-	for (auto it = this->m_shopItems.begin(); it != this->m_shopItems.end(); ++it)
-	{
-		const QString& shopCode = it.key();
-		const QMap<QString, QJsonObject>& items = it.value();
-
-		QJsonObject save;
-		for (auto it = items.begin(); it != items.end(); ++it)
-		{
-			save.insert(it.key(), it.value());
-		}
-		obj[shopCode] = save;
-	}
-
-	QFile f_out(dir.filePath("item.search.json"));
-	if (f_out.open(QIODevice::WriteOnly))
-	{
-		QJsonDocument doc(obj);
-		f_out.write(doc.toJson(QJsonDocument::Compact));
-	}
-}
-void RakutenItemModel::load(const QDir& dir)
-{
-	QSettings settings(dir.filePath("orders.ini"), QSettings::IniFormat);
-
-	// orders
-	const QStringList orderNumberList = settings.childGroups();
-	for (const QString& orderNumber : orderNumberList)
-	{
-		auto& vec = this->m_orders[orderNumber];
-		settings.beginGroup(orderNumber);
-		const int size = settings.beginReadArray("orders");
-		for (int i = 0; i < size; i++)
-		{
-			settings.setArrayIndex(i);
-
-			QSharedPointer<getOrder_resp> resp = QSharedPointer<getOrder_resp>::create();
-			resp->deserialize(settings);
-			vec.push_back(std::move(resp));
-		}
-		settings.endArray();
-		settings.endGroup();
-	}
-
-	// shopItems
-	QFile f_in(dir.filePath("item.search.json"));
-	if (!f_in.open(QIODevice::ReadOnly))
-		return;
-
-	const QJsonObject all_obj = QJsonDocument::fromJson(f_in.readAll()).object();
-	this->m_shopItems.clear();
-	for (const QString& key : all_obj.keys())
-	{
-		QMap<QString, QJsonObject> shopData;
-		if (key != this->m_shopCode)
-		{
-			// shopCode : { id : { data }, ... }
-			const QJsonObject d = all_obj.value(key).toObject();
-			for (const QString& key : d.keys())
-				shopData[key] = d.value(key).toObject();
+			qWarning() << from_u8(u8"íçï∂èÓïÒÇÃï€ë∂Ç…é∏îsÇµÇ‹ÇµÇΩÅB");
 		}
 		else
 		{
-			this->beginResetModel();
-
-			this->m_items.clear();
-
-			// shopCode : { id : { data }, ... }
-			const QJsonObject d = all_obj.value(key).toObject();
-			for (const QString& key : d.keys())
+			QJsonObject obj;
+			for (auto it = this->m_orders.begin(); it != this->m_orders.end(); ++it)
 			{
-				const QJsonObject obj = d.value(key).toObject();
-				shopData[key] = obj;
-
-				QSharedPointer<rakuten_item> item = QSharedPointer<rakuten_item>::create();
-				item_from_obj(item, obj);
-				this->m_items.push_back(std::move(item));
+				obj.insert(it.key(), it.value()->serialize());
 			}
 
-			this->endResetModel();
+			f_out.write(QJsonDocument(obj).toJson());
+		}
+	}
+
+	// ItemAPI item.search
+	QFile f_out(dir.filePath("item.search.xml"));
+	if (!f_out.open(QIODevice::WriteOnly))
+	{
+		qWarning() << from_u8(u8"item.search.xmlÇÃï€ë∂Ç…é∏îsÇµÇ‹ÇµÇΩÅB");
+		return;
+	}
+
+	QXmlStreamWriter stream(&f_out);
+	stream.writeStartDocument();
+	stream.writeStartElement("data");
+	for (auto it = this->m_allItems.begin(); it != this->m_allItems.end(); ++it)
+	{
+		const QString& shopCode = it.key();
+		const auto& items = it.value();
+
+		stream.writeStartElement("items");
+		stream.writeAttribute("shopCode", shopCode);
+		for (const auto item : items)
+		{
+			item->write(stream);
+		}
+		stream.writeEndElement();
+	}
+	stream.writeEndElement();
+}
+void RakutenItemModel::load(const QDir& dir)
+{
+	// orders
+	{
+		this->m_orders.clear();
+
+		QFile f_in(dir.filePath(ORDERS_FILE_NAME));
+		if (f_in.open(QIODevice::ReadOnly))
+		{
+			const QJsonObject obj = QJsonDocument::fromJson(f_in.readAll()).object();
+			for (auto it = obj.constBegin(); it != obj.constEnd(); ++it)
+			{
+				this->m_orders[it.key()] = QSharedPointer<rpay::getOrder::OrderModel>::create(it.value().toObject());
+			}
+		}
+	}
+
+	// shopItems
+	this->m_allItems.clear();
+	QFile f_in(dir.filePath("item.search.xml"));
+	if (!f_in.open(QIODevice::ReadOnly))
+		return;
+
+	QDomDocument doc;
+	doc.setContent(f_in.readAll());
+	const QDomNodeList itemsList = doc.documentElement().elementsByTagName("items");
+	for (int i = 0; i < itemsList.count(); i++)
+	{
+		QMap<QString, item::search::item_ptr> m;
+		const QDomNode itemsNode = itemsList.at(i);
+		const QString shopCode = itemsNode.attributes().namedItem("shopCode").nodeValue();
+		const QDomNodeList itemList = itemsNode.toElement().elementsByTagName("item");
+		for (int i = 0; i < itemList.count(); i++)
+		{
+			item::search::item_ptr item = item::search::item_ptr::create(itemList.at(i));
+			m[item->itemUrl] = item;
 		}
 
-		this->m_shopItems[key] = shopData;
+		this->m_allItems[shopCode] = m;
 	}
+
+
+	// notify changes
+	this->beginResetModel();
+
+	this->m_items.clear();
+	for (auto it = this->m_allItems.begin(); it != this->m_allItems.end(); ++it)
+	{
+		if (it.key() == this->m_shopCode)
+		{
+			for (auto item : it.value())
+			{
+				this->m_items.push_back(item);
+			}
+		}
+	}
+
+	this->endResetModel();
+}
+
+
+void RakutenItemModel::setShopCode(const QString& shopCode)
+{
+	if (shopCode == this->m_shopCode)
+		return;
+
+	this->m_shopCode = shopCode;
+
+	// notify changes
+	this->beginResetModel();
+
+	this->m_items.clear();
+	for (auto it = this->m_allItems.begin(); it != this->m_allItems.end(); ++it)
+	{
+		if (it.key() == this->m_shopCode)
+		{
+			for (auto item : it.value())
+			{
+				this->m_items.push_back(item);
+			}
+		}
+	}
+
+	this->endResetModel();
 }
 
 
@@ -261,86 +240,105 @@ bool RakutenItemModel::containsOrder(const QString& orderNumber)
 {
 	return this->m_orders.contains(orderNumber);
 }
-void RakutenItemModel::insertOrder(const QString& orderNumber, QVector<QSharedPointer<getOrder_resp>>&& orders)
+void RakutenItemModel::insertOrder(const QString& orderNumber, QSharedPointer<rpay::getOrder::OrderModel> order)
 {
-	this->m_orders[orderNumber] = std::move(orders);
+	this->m_orders[orderNumber] = order;
 }
 
 
 bool RakutenItemModel::contains(const QString& shopCode, const QString& manageNumber) const
 {
-	auto it = this->m_shopItems.find(shopCode);
-	return it != this->m_shopItems.end() && it->contains(manageNumber);
+	auto it = this->m_allItems.find(shopCode);
+	return it != this->m_allItems.end() && it->contains(manageNumber);
 }
-void RakutenItemModel::addItem(const QString& shopCode, const QJsonObject& obj)
+void RakutenItemModel::addItem(const QString& shopCode, item::search::item_ptr item)
 {
-	if (!obj.contains("itemUrl"))
+	const bool replace = this->m_allItems[shopCode].contains(item->itemUrl);
+	this->m_allItems[shopCode][item->itemUrl] = item;
+	if (this->m_shopCode != shopCode)
 		return;
 
-	bool replace = false;
-	const QString itemUrl = obj["itemUrl"].toString();
-	if (this->m_shopItems[shopCode].contains(itemUrl))
+	if (replace)
 	{
-		// update
-		replace = true;
-	}
-
-	this->m_shopItems[shopCode][itemUrl] = obj;
-	if (this->m_shopCode == shopCode)
-	{
-		if (replace)
+		for (int i = 0; i < this->m_items.size(); i++)
 		{
-			for (int i = 0; i < this->m_items.size(); i++)
+			if (this->m_items[i]->itemUrl == item->itemUrl)
 			{
-				auto& item = this->m_items[i];
-				if (item->itemUrl == itemUrl)
-				{
-					item_from_obj(item, obj);
-					emit this->dataChanged(this->index(i, 0), this->index(i, this->columnCount() - 1));
-					break;
-				}
+				this->m_items[i] = item;
+				emit this->dataChanged(this->index(i, 0), this->index(i, this->columnCount() - 1));
+				break;
 			}
 		}
-		else
-		{
-			// emit signal
-			this->beginInsertRows(QModelIndex(), this->m_items.count(), this->m_items.count());
+	}
+	else
+	{
+		// emit signal
+		this->beginInsertRows(QModelIndex(), this->m_items.count(), this->m_items.count());
 
-			QSharedPointer<rakuten_item> item = QSharedPointer<rakuten_item>::create();
-			item_from_obj(item, obj);
-			this->m_items.push_back(std::move(item));
+		this->m_items.push_back(item);
 
-			// emit signal
-			this->endInsertRows();
-		}
+		// emit signal
+		this->endInsertRows();
 	}
 }
 
 
-QVector<QSharedPointer<rakuten_item>> RakutenItemModel::ranking(const QString& shopCode)
+QList<QPair<QString, int>> RakutenItemModel::get_ranking_items(const QString& shopCode)
+{
+	const QDateTime _30daysb4 = QDateTime::currentDateTime().addDays(-30);
+	QList<QPair<QString, int>> items;
+
+	// íçï∂âÒêîÇranking_mapÇ…éÊìæ
+	std::unordered_map<QString, int> ranking_map;
+	for (const auto order : this->m_orders)
+	{
+		if (order->orderDatetime < _30daysb4)
+			continue;
+
+		for (const auto item : order->items)
+		{
+			ranking_map[item->manageNumber] += item->units;
+		}
+	}
+
+	// map > vector
+	for (const auto& pair : ranking_map)
+	{
+		items.push_back({ pair.first, pair.second });
+	}
+
+	// sort by number
+	qSort(items.begin(), items.end(), [](const QPair<QString, int>& a, const QPair<QString, int>& b)
+	{
+		return a.second > b.second;
+	});
+
+	return items;
+}
+
+QVector<item::search::item_ptr> RakutenItemModel::get_ranking_items2(const QString& shopCode)
 {
 	const int ranking_max_size = 3 * 3;
-	QVector<QSharedPointer<rakuten_item>> _items;
-	if (!m_shopItems.contains(shopCode))
+	QVector<item::search::item_ptr> _items;
+	if (!m_allItems.contains(shopCode))
 	{
 		return _items;
 	}
 
 	const QDateTime _30daysb4 = QDateTime::currentDateTime().addDays(-30);
-
 	std::unordered_map<QString, int> ranking_map;
-	for (const auto& orderedItems : this->m_orders)
+	for (const auto order : this->m_orders)
 	{
-		for (const auto item : orderedItems)
+		if (order->orderDatetime < _30daysb4)
+			continue;
+
+		for (const auto item : order->items)
 		{
-			if (_30daysb4 <= item->orderDatetime)
-			{
-				ranking_map[item->manageNumber] += item->units;
-			}
+			ranking_map[item->manageNumber] += item->units;
 		}
 	}
 
-	QVector<QPair<QString, int>> v;
+	QList <QPair<QString, int>> v;
 	for (const auto& pair : ranking_map)
 	{
 		v.push_back({ pair.first, pair.second });
@@ -358,7 +356,6 @@ QVector<QSharedPointer<rakuten_item>> RakutenItemModel::ranking(const QString& s
 		if (_done)
 			break;
 
-		// error or what
 		for (auto item : this->m_items)
 		{
 			if (item->itemUrl == pair.first)
@@ -382,17 +379,18 @@ QVector<QSharedPointer<rakuten_item>> RakutenItemModel::ranking(const QString& s
 	}
 	return _items;
 }
-QVector<QSharedPointer<rakuten_item>> RakutenItemModel::new_items(const QString& shopCode)
+
+QVector<item::search::item_ptr> RakutenItemModel::new_items(const QString& shopCode)
 {
-	QVector<QSharedPointer<rakuten_item>> _items;
-	if (!m_shopItems.contains(shopCode))
+	QVector<item::search::item_ptr> _items;
+	if (!m_allItems.contains(shopCode))
 	{
 		return _items;
 	}
 
 	// sort by registDate
 	_items = this->m_items.toVector();
-	qSort(_items.begin(), _items.end(), [](const QSharedPointer<rakuten_item>& a, const QSharedPointer<rakuten_item>& b)
+	qSort(_items.begin(), _items.end(), [](const item::search::item_ptr& a, const item::search::item_ptr& b)
 	{
 		return a->registDate > b->registDate;
 	});

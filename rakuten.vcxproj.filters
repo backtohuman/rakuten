@@ -63,6 +63,9 @@
     <ClCompile Include="test.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="rakuten.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="MainWindow.hpp">
@@ -73,6 +76,9 @@
     </QtMoc>
     <QtMoc Include="rakuten_client.hpp">
       <Filter>client</Filter>
+    </QtMoc>
+    <QtMoc Include="MyProgressDlg.hpp">
+      <Filter>ui</Filter>
     </QtMoc>
   </ItemGroup>
   <ItemGroup>
@@ -93,6 +99,9 @@
     </ClInclude>
     <ClInclude Include="test.hpp">
       <Filter>test</Filter>
+    </ClInclude>
+    <ClInclude Include="rakuten.hpp">
+      <Filter>model</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

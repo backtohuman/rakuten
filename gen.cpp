@@ -1,12 +1,14 @@
 #include "stdafx.h"
 
+#include "rakuten.hpp"
 #include "rakuten_client.hpp"
 #include "RakutenItemModel.hpp"
 #include "qt_helper.hpp"
+#include "settings.hpp"
 #include <qfont.h>
 #include <qsvggenerator.h>
 
-QString get_image_src(QSharedPointer<rakuten_item> item)
+QString get_image_src(item::search::item_ptr item)
 {
 	if (item->images.isEmpty())
 		return QString();
@@ -26,7 +28,7 @@ QString get_image_src(QSharedPointer<rakuten_item> item)
 }
 
 
-QString gen_new_item_row(const QVector<QSharedPointer<rakuten_item>>& new_items, const QString& filepath)
+QString gen_new_item_row(const QVector<item::search::item_ptr>& new_items, const QString& filepath)
 {
 	QFile f_out(filepath);
 	if (!f_out.open(QIODevice::WriteOnly))
@@ -99,12 +101,12 @@ QString gen_new_item_row(const QVector<QSharedPointer<rakuten_item>>& new_items,
 		const bool write_0 = true;
 		const bool write_1 = (i + 1) < size;
 		const bool write_2 = (i + 2) < size;
-		const QSharedPointer<rakuten_item> item0 = write_0 ? new_items[i + 0] : nullptr;
-		const QSharedPointer<rakuten_item> item1 = write_1 ? new_items[i + 1] : nullptr;
-		const QSharedPointer<rakuten_item> item2 = write_2 ? new_items[i + 2] : nullptr;
+		const item::search::item_ptr item0 = write_0 ? new_items[i + 0] : nullptr;
+		const item::search::item_ptr item1 = write_1 ? new_items[i + 1] : nullptr;
+		const item::search::item_ptr item2 = write_2 ? new_items[i + 2] : nullptr;
 
 		// functions
-		auto _write_img = [](QXmlStreamWriter& stream, QSharedPointer<rakuten_item> item)
+		auto _write_img = [](QXmlStreamWriter& stream, item::search::item_ptr item)
 		{
 			stream.writeStartElement("td");
 			stream.writeAttribute("class", "img");
@@ -113,7 +115,7 @@ QString gen_new_item_row(const QVector<QSharedPointer<rakuten_item>>& new_items,
 			stream.writeAttribute("width", QString::number(CLIENT_WIDTH));
 			stream.writeEndElement();
 		};
-		auto _write_date = [](QXmlStreamWriter& stream, QSharedPointer<rakuten_item> item)
+		auto _write_date = [](QXmlStreamWriter& stream, item::search::item_ptr item)
 		{
 			stream.writeStartElement("td");
 			stream.writeAttribute("class", "date");
@@ -122,7 +124,7 @@ QString gen_new_item_row(const QVector<QSharedPointer<rakuten_item>>& new_items,
 			stream.writeCharacters(dtstring);
 			stream.writeEndElement();
 		};
-		auto _write_name = [](QXmlStreamWriter& stream, QSharedPointer<rakuten_item> item)
+		auto _write_name = [](QXmlStreamWriter& stream, item::search::item_ptr item)
 		{
 			stream.writeStartElement("td");
 			stream.writeAttribute("class", "name");
@@ -134,7 +136,7 @@ QString gen_new_item_row(const QVector<QSharedPointer<rakuten_item>>& new_items,
 				stream.writeCharacters(title);
 			stream.writeEndElement();
 		};
-		auto _write_price = [](QXmlStreamWriter& stream, QSharedPointer<rakuten_item> item)
+		auto _write_price = [](QXmlStreamWriter& stream, item::search::item_ptr item)
 		{
 			stream.writeStartElement("td");
 			stream.writeAttribute("class", "price");
@@ -199,7 +201,7 @@ QString gen_new_item_row(const QVector<QSharedPointer<rakuten_item>>& new_items,
 }
 
 
-QString gen_rank_item_row(const QVector<QSharedPointer<rakuten_item>>& new_items, int rank_start, const QString& filepath)
+QString gen_rank_item_row(const QVector<item::search::item_ptr>& new_items, int rank_start, const QString& filepath)
 {
 	QFile f_out(filepath);
 	if (!f_out.open(QIODevice::WriteOnly))
@@ -281,12 +283,12 @@ QString gen_rank_item_row(const QVector<QSharedPointer<rakuten_item>>& new_items
 		const bool write_0 = true;
 		const bool write_1 = (i + 1) < size;
 		const bool write_2 = (i + 2) < size;
-		const QSharedPointer<rakuten_item> item0 = write_0 ? new_items[i + 0] : nullptr;
-		const QSharedPointer<rakuten_item> item1 = write_1 ? new_items[i + 1] : nullptr;
-		const QSharedPointer<rakuten_item> item2 = write_2 ? new_items[i + 2] : nullptr;
+		const item::search::item_ptr item0 = write_0 ? new_items[i + 0] : nullptr;
+		const item::search::item_ptr item1 = write_1 ? new_items[i + 1] : nullptr;
+		const item::search::item_ptr item2 = write_2 ? new_items[i + 2] : nullptr;
 
 		// functions
-		auto _write_rank = [](QXmlStreamWriter& stream, QSharedPointer<rakuten_item> item, int rank)
+		auto _write_rank = [](QXmlStreamWriter& stream, item::search::item_ptr item, int rank)
 		{
 			stream.writeStartElement("td");
 			stream.writeAttribute("class", "rank");
@@ -317,7 +319,7 @@ QString gen_rank_item_row(const QVector<QSharedPointer<rakuten_item>>& new_items
 			}
 			stream.writeEndElement();
 		};
-		auto _write_img = [](QXmlStreamWriter& stream, QSharedPointer<rakuten_item> item)
+		auto _write_img = [](QXmlStreamWriter& stream, item::search::item_ptr item)
 		{
 			stream.writeStartElement("td");
 			stream.writeAttribute("class", "img");
@@ -326,7 +328,7 @@ QString gen_rank_item_row(const QVector<QSharedPointer<rakuten_item>>& new_items
 			stream.writeAttribute("width", QString::number(CLIENT_WIDTH));
 			stream.writeEndElement();
 		};
-		auto _write_name = [](QXmlStreamWriter& stream, QSharedPointer<rakuten_item> item)
+		auto _write_name = [](QXmlStreamWriter& stream, item::search::item_ptr item)
 		{
 			stream.writeStartElement("td");
 			stream.writeAttribute("class", "name");
@@ -338,7 +340,7 @@ QString gen_rank_item_row(const QVector<QSharedPointer<rakuten_item>>& new_items
 				stream.writeCharacters(title);
 			stream.writeEndElement();
 		};
-		auto _write_price = [](QXmlStreamWriter& stream, QSharedPointer<rakuten_item> item)
+		auto _write_price = [](QXmlStreamWriter& stream, item::search::item_ptr item)
 		{
 			stream.writeStartElement("td");
 			stream.writeAttribute("class", "price");
@@ -403,9 +405,13 @@ QString gen_rank_item_row(const QVector<QSharedPointer<rakuten_item>>& new_items
 }
 
 
-QString gen_entire_html(const QVector<QSharedPointer<rakuten_item>>& new_items, const QVector<QSharedPointer<rakuten_item>>& rankItems, const QDir& dir)
+QString gen_entire_html(
+	const QVector<item::search::item_ptr>& new_items,
+	const QVector<item::search::item_ptr>& rankItems,
+	const QDir& dir,
+	const QString& shopCode, const QString& new_item_path, const QString& rank_item_path)
 {
-	QFile f_out(dir.filePath("generated_final.html"));
+	QFile f_out(dir.filePath(ENTIRE_HTML_FILENAME));
 	if (!f_out.open(QIODevice::WriteOnly))
 	{
 		return QString();
@@ -433,15 +439,18 @@ QString gen_entire_html(const QVector<QSharedPointer<rakuten_item>>& new_items, 
 	stream.writeEndElement();
 	stream.writeEndElement();
 
+	const QString rakuten_url = QString("https://item.rakuten.co.jp/%1/").arg(shopCode);
+	const QString rakuten_gold_url = QString("https://www.rakuten.ne.jp/gold/%1/").arg(shopCode);
+
 	const int size = new_items.size();
 	for (int i = 0; i < size; i += 3)
 	{
 		const bool write_0 = true;
 		const bool write_1 = (i + 1) < size;
 		const bool write_2 = (i + 2) < size;
-		const QSharedPointer<rakuten_item> item0 = write_0 ? new_items[i + 0] : nullptr;
-		const QSharedPointer<rakuten_item> item1 = write_1 ? new_items[i + 1] : nullptr;
-		const QSharedPointer<rakuten_item> item2 = write_2 ? new_items[i + 2] : nullptr;
+		const item::search::item_ptr item0 = write_0 ? new_items[i + 0] : nullptr;
+		const item::search::item_ptr item1 = write_1 ? new_items[i + 1] : nullptr;
+		const item::search::item_ptr item2 = write_2 ? new_items[i + 2] : nullptr;
 
 		auto _write_item = [](QXmlStreamWriter& stream, const QString& href, const QString& src)
 		{
@@ -457,11 +466,20 @@ QString gen_entire_html(const QVector<QSharedPointer<rakuten_item>>& new_items, 
 			stream.writeEndElement();
 		};
 
-		// rank
+		// new item
+		QString path;
+		for (const QString& part : new_item_path.split(QRegularExpression("\\\\/"), Qt::SkipEmptyParts))
+		{
+			if (!path.isEmpty())
+				path.append('/');
+			path.append(part);
+		}
+		const QString parent_path = rakuten_gold_url + path;
+
 		stream.writeStartElement("tr");
-		if (write_0) _write_item(stream, QString("https://item.rakuten.co.jp/kstar/").append(item0->itemUrl), QString("https://www.rakuten.ne.jp/gold/kstar/ectool/n111/%1.png").arg(i + 1));
-		if (write_1) _write_item(stream, QString("https://item.rakuten.co.jp/kstar/").append(item1->itemUrl), QString("https://www.rakuten.ne.jp/gold/kstar/ectool/n111/%1.png").arg(i + 2));
-		if (write_2) _write_item(stream, QString("https://item.rakuten.co.jp/kstar/").append(item2->itemUrl), QString("https://www.rakuten.ne.jp/gold/kstar/ectool/n111/%1.png").arg(i + 3));
+		if (write_0) _write_item(stream, QString(rakuten_url).append(item0->itemUrl), QString("%1/%2.png").arg(parent_path).arg(i + 1));
+		if (write_1) _write_item(stream, QString(rakuten_url).append(item1->itemUrl), QString("%1/%2.png").arg(parent_path).arg(i + 2));
+		if (write_2) _write_item(stream, QString(rakuten_url).append(item2->itemUrl), QString("%1/%2.png").arg(parent_path).arg(i + 3));
 		stream.writeEndElement(); // /tr
 	}
 
@@ -486,9 +504,9 @@ QString gen_entire_html(const QVector<QSharedPointer<rakuten_item>>& new_items, 
 		const bool write_0 = true;
 		const bool write_1 = (i + 1) < size;
 		const bool write_2 = (i + 2) < size;
-		const QSharedPointer<rakuten_item> item0 = write_0 ? rankItems[i + 0] : nullptr;
-		const QSharedPointer<rakuten_item> item1 = write_1 ? rankItems[i + 1] : nullptr;
-		const QSharedPointer<rakuten_item> item2 = write_2 ? rankItems[i + 2] : nullptr;
+		const item::search::item_ptr item0 = write_0 ? rankItems[i + 0] : nullptr;
+		const item::search::item_ptr item1 = write_1 ? rankItems[i + 1] : nullptr;
+		const item::search::item_ptr item2 = write_2 ? rankItems[i + 2] : nullptr;
 
 		auto _write_item = [](QXmlStreamWriter& stream, const QString& href, const QString& src)
 		{
@@ -505,10 +523,19 @@ QString gen_entire_html(const QVector<QSharedPointer<rakuten_item>>& new_items, 
 		};
 
 		// rank
+		QString path;
+		for (const QString& part : rank_item_path.split(QRegularExpression("\\\\/"), Qt::SkipEmptyParts))
+		{
+			if (!path.isEmpty())
+				path.append('/');
+			path.append(part);
+		}
+		const QString parent_path = rakuten_gold_url + path;
+
 		stream.writeStartElement("tr");
-		if (write_0) _write_item(stream, QString("https://item.rakuten.co.jp/kstar/").append(item0->itemUrl), QString("https://www.rakuten.ne.jp/gold/kstar/ectool/r111/%1.png").arg(i + 1));
-		if (write_1) _write_item(stream, QString("https://item.rakuten.co.jp/kstar/").append(item1->itemUrl), QString("https://www.rakuten.ne.jp/gold/kstar/ectool/r111/%1.png").arg(i + 2));
-		if (write_2) _write_item(stream, QString("https://item.rakuten.co.jp/kstar/").append(item2->itemUrl), QString("https://www.rakuten.ne.jp/gold/kstar/ectool/r111/%1.png").arg(i + 3));
+		if (write_0) _write_item(stream, rakuten_url + item0->itemUrl, QString("%1/%2.png").arg(parent_path).arg(i + 1));
+		if (write_1) _write_item(stream, rakuten_url + item1->itemUrl, QString("%1/%2.png").arg(parent_path).arg(i + 2));
+		if (write_2) _write_item(stream, rakuten_url + item2->itemUrl, QString("%1/%2.png").arg(parent_path).arg(i + 3));
 		stream.writeEndElement(); // /tr
 	}
 
@@ -526,7 +553,7 @@ QString gen_entire_html(const QVector<QSharedPointer<rakuten_item>>& new_items, 
 }
 
 
-void gen_newitem_svg(QSharedPointer<rakuten_item> item, const QString& filename)
+void gen_newitem_svg(item::search::item_ptr item, const QString& filename)
 {
 	const int width = 100;
 

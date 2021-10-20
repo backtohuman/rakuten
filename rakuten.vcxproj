@@ -106,7 +106,10 @@
     </QtMoc>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="rakuten.cpp" />
     <ClCompile Include="test.cpp" />
+    <QtMoc Include="MyProgressDlg.hpp" />
+    <ClInclude Include="rakuten.hpp" />
     <ClInclude Include="test.hpp" />
     <QtRcc Include="rakuten.qrc" />
     <QtUic Include="rakuten.ui" />

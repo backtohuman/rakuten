@@ -1,9 +1,10 @@
 #pragma once
 
+#include "rakuten.hpp"
+
 // forward declare
 class RakutenItemModel;
 class rakuten_client;
-struct rakuten_item;
 
 class MainWindow : public QMainWindow
 {
@@ -40,6 +41,11 @@ private slots:
 	void on_save();
 	void on_save_as();
 
+	void get_orders();
+	void newitems();
+	void gen_png();
+	void gen_html();
+
 private:
 	void async_saveRankItemImages();
 	void async_saveNewItemImages();
@@ -71,14 +77,14 @@ private:
 	// generator
 	bool m_rank_mode;
 	int m_rankIndex, m_newIndex;
-	QVector<QSharedPointer<rakuten_item>> m_rankItems, m_newItems;
+	QVector<item::search::item_ptr> m_rankItems, m_newItems;
 
 
 	// settings
-	QLineEdit* m_applicationIdEdit, *m_serviceSecretEdit, * m_licenseKeyEdit, *m_shopCodeEdit;
+	QLineEdit* m_applicationIdEdit, *m_serviceSecretEdit, * m_licenseKeyEdit, *m_shopCodeEdit,
+		*m_ftpRelativePathEdit;
 
 
 	//
 	QTabWidget* m_mainTabWidget;
-	QProgressDialog* m_progressDlg;
 };

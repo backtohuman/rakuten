@@ -3,6 +3,58 @@
 
 #define CLIENT_WIDTH (111)
 
+// https://webservice.rms.rakuten.co.jp/merchant-portal/view/ja/common/1-1_service_index/functionsCommonDefinition
+struct APIResponseStatus
+{
+	QString interfaceId, systemStatus, message, requestId;
+	QDomElement requests;
+
+	APIResponseStatus()
+	{
+	}
+	APIResponseStatus(const QByteArray& data)
+	{
+		QDomDocument doc;
+		doc.setContent(data);
+		const QDomElement e_status = doc.documentElement().firstChildElement("status");
+		for (QDomNode n = e_status.firstChild(); !n.isNull(); n = n.nextSibling())
+		{
+			const QDomElement e = n.toElement();
+			if (e.tagName() == QLatin1String("interfaceId"))
+			{
+				this->interfaceId = e.text();
+			}
+			else if (e.tagName() == QLatin1String("systemStatus"))
+			{
+				this->systemStatus = e.text();
+			}
+			else if (e.tagName() == QLatin1String("message"))
+			{
+				this->message = e.text();
+			}
+			else if (e.tagName() == QLatin1String("requestId"))
+			{
+				this->requestId = e.text();
+			}
+			else if (e.tagName() == QLatin1String("requests"))
+			{
+				this->requests = e;
+			}
+		}
+	}
+
+	bool isOk() const
+	{
+		return this->systemStatus == QLatin1String("OK");
+	}
+	bool isNG() const
+	{
+		return this->systemStatus == QLatin1String("NG");
+	}
+};
+Q_DECLARE_METATYPE(APIResponseStatus)
+
+
 
 struct PaginationRequestModel
 {
@@ -126,9 +178,20 @@ private:
 protected:
 	void timerEvent(QTimerEvent* e) override;
 
+
 public:
-	void searchOrder(struct searchOrder_param& param);
-	void searchOrder();
+	bool isFinished()
+	{
+		return this->m_item_search_queue.isEmpty()
+			&& this->m_payOrderAPIRequests.isEmpty()
+			&& this->m_replyBuffers.isEmpty();
+	}
+
+
+	void license_get();
+
+	void queue_searchOrder(struct searchOrder_param& param);
+	void queue_searchOrder();
 
 	// returns queued number
 	void queue_getOrder(const getOrder_param& param);
@@ -136,34 +199,39 @@ public:
 	int queue_getOrder(const QJsonArray& orderNumberList);
 	int queue_getOrder();
 
-	// ItemAPI
+	void queue_item_search(const QString& itemUrl, bool force = false);
+
+	// IchibaAPI
+	bool IchibaItem_Search(int page = 1);
+
+
+
+
 private:
 	// itemUrl=商品管理番号
 	void item_search(const QString& itemUrl);
 
-public:
-	void queue_item_search(const QString& itemUrl, bool force = false);
-
-	// IchibaAPI
-	void IchibaItem_Search(int page = 1);
-
-
-private:
 	void onSearchOrder(QNetworkReply* reply);
 	void onGetOrder(QNetworkReply* reply);
 
 
 private slots:
 	void IchibaItem_Search_finished();
+	void licenseExpiryDateFinished();
 	void item_search_finished();
 	void payOrderAPIFinished();
 
 signals:
+	void signal_itemAPIFinished(const APIResponseStatus& status);
+
 	void signal_error(const QString& error);
 	void signal_searchOrderFinished(bool);
 	void signal_getOrderFinished(bool);
 	void signal_IchibaItemSearchFinished(bool);
 	void signal_itemSearchFinished(const QString& itemUrl);
+
+	//
+	void queuedItemSearch(int n);
 
 private:
 	QString m_applicationId;
@@ -184,4 +252,7 @@ private:
 	// <店舗コード, Vec<商品管理番号>>
 	QMap<QString, QVector<QString>> m_ichiba_items;
 	RakutenItemModel* m_model;
+
+	//
+	QMap<QNetworkReply*, QByteArray> m_replyBuffers;
 };

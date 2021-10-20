@@ -6,17 +6,22 @@
 #include "qt_helper.hpp"
 #include "RakutenItemModel.hpp"
 #include "settings.hpp"
+#include "MyProgressDlg.hpp"
 
-extern QString gen_new_item_row(const QVector<QSharedPointer<rakuten_item>>& new_items, const QString& filepath);
-extern QString gen_rank_item_row(const QVector<QSharedPointer<rakuten_item>>& new_items, int rank_start, const QString& filepath);
-extern QString gen_entire_html(const QVector<QSharedPointer<rakuten_item>>& new_items, const QVector<QSharedPointer<rakuten_item>>& rankItems, const QDir& dir);
-extern void gen_newitem_svg(QSharedPointer<rakuten_item> item, const QString& filename);
+extern QString gen_new_item_row(const QVector<item::search::item_ptr>& new_items, const QString& filepath);
+extern QString gen_rank_item_row(const QVector<item::search::item_ptr>& new_items, int rank_start, const QString& filepath);
+extern QString gen_entire_html(
+	const QVector<item::search::item_ptr>& new_items,
+	const QVector<item::search::item_ptr>& rankItems,
+	const QDir& dir,
+	const QString& shopCode, const QString& new_item_path, const QString& rank_item_path);
+extern void gen_newitem_svg(item::search::item_ptr item, const QString& filename);
 
 // MainWindow
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
 {
 	// create folder
-	this->m_saveDir = openSubDir(QCoreApplication::applicationDirPath(), "ectool");
+	this->m_saveDir = openSubDir(QCoreApplication::applicationDirPath(), DEFAULT_FOLDER_NAME);
 
 	// local variables
 	this->m_rank_mode = false;
@@ -57,11 +62,10 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
 	this->loadSettings(settings_global);
 
 	// load cache
-	QSettings settings(this->m_saveDir.filePath("orders.ini"), QSettings::IniFormat);
 	this->m_rakutenItemModel->load(this->m_saveDir);
 
 	// load last
-	QFile f_in(this->m_saveDir.filePath("generated_final.html"));
+	QFile f_in(this->m_saveDir.filePath(ENTIRE_HTML_FILENAME));
 	if (f_in.open(QIODevice::ReadOnly))
 	{
 		this->m_viewForSave->setHtml(f_in.readAll());
@@ -164,117 +168,25 @@ QWidget* MainWindow::_createMainTab()
 	this->m_viewForSave->layout()->setSpacing(0);
 	this->m_viewForSave->layout()->setMargin(0);
 
-	// for g00d
-	this->m_progressDlg = new QProgressDialog(this);
-	this->m_progressDlg->setAutoReset(false);
-	this->m_progressDlg->hide();
-
 	QPushButton* getOrderBtn = new QPushButton(from_u8(u8"注文を取得"));
 	QPushButton* newItemBtn = new QPushButton(from_u8(u8"新着アイテム"));
 	QPushButton* genBtn = new QPushButton(from_u8(u8"画像生成"));
 	QPushButton* genFinalBtn = new QPushButton(from_u8(u8"HTML生成"));
+	QPushButton* openFolderBtn = new QPushButton(from_u8(u8"フォルダを開く"));
 
 	// ranking
-	QObject::connect(getOrderBtn, &QPushButton::clicked, this, [this]()
-	{
-		searchOrder_param param;
-		param.pagination.requestRecordsAmount = 1000;
-		this->m_rakuten->searchOrder(param);
-
-		this->m_progressDlg->setLabelText(from_u8(u8"注文を取得しています..."));
-		this->m_progressDlg->setCancelButtonText(from_u8(u8"取消"));
-		this->m_progressDlg->setRange(0, 1);
-		this->m_progressDlg->setWindowModality(Qt::WindowModal);
-		this->m_progressDlg->exec();
-	});
-	QObject::connect(this->m_rakuten, &rakuten_client::signal_searchOrderFinished, this, [this](bool ok)
-	{
-		// autoclose
-		if (ok)
-		{
-			const int queued = this->m_rakuten->queue_getOrder();
-			qDebug() << "queued:" << queued;
-
-			if (queued == 0)
-			{
-				this->m_progressDlg->setRange(0, 1);
-				this->m_progressDlg->setValue(1);
-				this->m_progressDlg->setLabelText(from_u8(u8"注文を取得しました。"));
-				this->m_progressDlg->setCancelButtonText(from_u8(u8"OK"));
-				QTimer::singleShot(2500, [this]() { this->m_progressDlg->reset(); });
-			}
-			else
-			{
-				this->m_progressDlg->setRange(0, queued);
-				this->m_progressDlg->setValue(0);
-				this->m_progressDlg->setLabelText(from_u8(u8"注文を取得しています..."));
-				this->m_progressDlg->setCancelButtonText(from_u8(u8"取消"));
-			}
-		}
-		else
-		{
-			this->m_progressDlg->setLabelText(from_u8(u8"失敗しました。"));
-			this->m_progressDlg->setCancelButtonText(from_u8(u8"閉じる"));
-		}
-	});
-	QObject::connect(this->m_rakuten, &rakuten_client::signal_getOrderFinished, this, [this](bool ok)
-	{
-		if (ok)
-			this->m_progressDlg->setValue(this->m_progressDlg->value() + 1);
-		else
-		{
-			this->m_progressDlg->setValue(this->m_progressDlg->value() + 1);
-		}
-
-		if (this->m_progressDlg->value() >= this->m_progressDlg->maximum())
-		{
-			this->m_progressDlg->setLabelText(from_u8(u8"注文を取得しました。"));
-			this->m_progressDlg->setCancelButtonText(from_u8(u8"OK"));
-			QTimer::singleShot(2500, [this]() { this->m_progressDlg->reset(); });
-		}
-	});
+	QObject::connect(getOrderBtn, &QPushButton::clicked, this, &MainWindow::get_orders);
 
 	// newitem
-	QObject::connect(newItemBtn, &QPushButton::clicked, this, [this]()
-	{
-		this->m_rakuten->IchibaItem_Search();
-	});
-	QObject::connect(this->m_rakuten, &rakuten_client::signal_itemSearchFinished, this, [this](const QString& itemUrl)
-	{
-	});
+	QObject::connect(newItemBtn, &QPushButton::clicked, this, &MainWindow::newitems);
 
 	// gen
-	QObject::connect(genBtn, &QPushButton::clicked, this, [this](bool checked)
-	{
-		if (this->m_imgTimerId != 0)
-		{
-			// cannot start
-			QMessageBox::warning(this, QString(), from_u8(u8"現在画像を生成中です。"));
-			return;
-		}
+	QObject::connect(genBtn, &QPushButton::clicked, this, &MainWindow::gen_png);
+	QObject::connect(genFinalBtn, &QPushButton::clicked, this, &MainWindow::gen_html);
 
-		this->m_rank_mode = true;
-		this->m_rankIndex = 0;
-		this->m_rankItems = this->m_rakutenItemModel->ranking(this->m_shopCodeEdit->text());
-		const QString html = gen_rank_item_row(m_rankItems, 1, this->m_saveDir.filePath("ranking_generated.html"));
-		if (!html.isEmpty())
-		{
-			this->renderDiv(html);
-		}
-	});
-	QObject::connect(genFinalBtn, &QPushButton::clicked, this, [this](bool checked)
+	QObject::connect(openFolderBtn, &QPushButton::clicked, this, [this]()
 	{
-		if (this->m_imgTimerId != 0)
-		{
-			// cannot start
-			QMessageBox::warning(this, QString(), from_u8(u8"現在画像を生成中です。"));
-			return;
-		}
-
-		this->m_rankItems = this->m_rakutenItemModel->ranking(this->m_shopCodeEdit->text());
-		this->m_newItems = this->m_rakutenItemModel->new_items(this->m_shopCodeEdit->text());
-		qApp->clipboard()->setText(gen_entire_html(this->m_newItems, this->m_rankItems, this->m_saveDir));
-		QMessageBox::information(this, QString(), from_u8(u8"クリップボードにコピーしました。"));
+		QDesktopServices::openUrl(QUrl::fromLocalFile(this->m_saveDir.absolutePath()));
 	});
 
 	QHBoxLayout* layout = new QHBoxLayout;
@@ -282,6 +194,7 @@ QWidget* MainWindow::_createMainTab()
 	layout->addWidget(newItemBtn);
 	layout->addWidget(genBtn);
 	layout->addWidget(genFinalBtn);
+	layout->addWidget(openFolderBtn);
 
 	QWidget* widget = new QWidget(this);
 	widget->setLayout(layout);
@@ -345,6 +258,7 @@ QWidget* MainWindow::_createSettingsTab()
 	this->m_serviceSecretEdit = new QLineEdit(widget);
 	this->m_licenseKeyEdit = new QLineEdit(widget);
 	this->m_shopCodeEdit = new QLineEdit(widget);
+	this->m_ftpRelativePathEdit = new QLineEdit(widget);
 
 	QObject::connect(m_applicationIdEdit, &QLineEdit::textChanged, this, [this](const QString& text)
 	{
@@ -363,6 +277,10 @@ QWidget* MainWindow::_createSettingsTab()
 		this->m_rakuten->setShopCode(text);
 		this->m_rakuten;
 	});
+	QObject::connect(m_ftpRelativePathEdit, &QLineEdit::textChanged, this, [this](const QString& text)
+	{
+		// hmmm
+	});
 
 
 	QFormLayout* layout = new QFormLayout;
@@ -370,7 +288,10 @@ QWidget* MainWindow::_createSettingsTab()
 	layout->addRow("serviceSecret: ", m_serviceSecretEdit);
 	layout->addRow("licenseKey: ", m_licenseKeyEdit);
 	layout->addRow("shopCode: ", m_shopCodeEdit);
+	layout->addRow(from_u8(u8"ftp上の使用するフォルダ名: "), m_ftpRelativePathEdit);
 	widget->setLayout(layout);
+
+	this->m_ftpRelativePathEdit->setText(DEFAULT_FOLDER_NAME);
 
 	return widget;
 }
@@ -413,6 +334,10 @@ void MainWindow::loadSettings(QSettings& settings)
 	this->m_licenseKeyEdit->setText(settings.value("licenseKey").toByteArray());
 	this->m_shopCodeEdit->setText(settings.value("shopCode").toByteArray());
 	settings.endGroup();
+
+	const QVariant var = settings.value("ftpRelativePath");
+	if (var.isValid())
+		this->m_ftpRelativePathEdit->setText(var.toString());
 }
 void MainWindow::saveSettings(QSettings& settings)
 {
@@ -443,6 +368,8 @@ void MainWindow::saveSettings(QSettings& settings)
 	settings.setValue("licenseKey", this->m_licenseKeyEdit->text());
 	settings.setValue("shopCode", this->m_shopCodeEdit->text());
 	settings.endGroup();
+
+	settings.setValue("ftpRelativePath", this->m_ftpRelativePathEdit->text());
 }
 
 void MainWindow::on_new()
@@ -459,6 +386,203 @@ void MainWindow::on_save_as()
 {
 }
 
+
+void MainWindow::get_orders()
+{
+	searchOrder_param param;
+	param.pagination.requestRecordsAmount = 1000;
+	this->m_rakuten->queue_searchOrder(param);
+
+	MyProgressDlg dlg(this);
+	dlg.setLabelText(from_u8(u8"注文を取得しています..."));
+	dlg.setCancelButtonText(from_u8(u8"取消"));
+	dlg.setValue(0);
+	dlg.setRange(0, 1);
+	dlg.setWindowModality(Qt::WindowModal);
+
+	QObject::connect(this->m_rakuten, &rakuten_client::signal_searchOrderFinished, &dlg, [this, &dlg](bool ok)
+	{
+		// autoclose
+		if (ok)
+		{
+			const int queued = this->m_rakuten->queue_getOrder();
+			qDebug() << "getOrder queued:" << queued;
+
+			if (queued == 0)
+			{
+				// done
+			}
+			else
+			{
+				dlg.setRange(0, queued + 1);
+				dlg.setValue(1);
+				dlg.setLabelText(from_u8(u8"注文を取得しています..."));
+				dlg.setCancelButtonText(from_u8(u8"取消"));
+			}
+		}
+		else
+		{
+			dlg.setLabelText(from_u8(u8"失敗しました。"));
+			dlg.setCancelButtonText(from_u8(u8"閉じる"));
+		}
+	});
+	QObject::connect(this->m_rakuten, &rakuten_client::signal_getOrderFinished, &dlg, [this, &dlg](bool ok)
+	{
+		if (ok)
+			dlg.incValue();
+		else
+		{
+			dlg.incValue();
+		}
+	});
+
+	// timer to make sure
+	QTimer t;
+	QObject::connect(&t, &QTimer::timeout, &dlg, [this, &t, &dlg]()
+	{
+		if (m_rakuten->isFinished())
+		{
+			dlg.setValue(dlg.maximum());
+			t.stop();
+		}
+	});
+	t.start(1000);
+	dlg.exec();
+}
+void MainWindow::newitems()
+{
+	if (!this->m_rakuten->IchibaItem_Search())
+	{
+		return;
+	}
+
+	MyProgressDlg dlg(this);
+	dlg.setLabelText(from_u8(u8"新着アイテムを取得しています..."));
+	dlg.setCancelButtonText(from_u8(u8"取消"));
+	dlg.setValue(0);
+	dlg.setRange(0, 1);
+	dlg.setWindowModality(Qt::WindowModal);
+
+	QTimer t;
+	QObject::connect(&t, &QTimer::timeout, this, [this, &t, &dlg]()
+	{
+		if (m_rakuten->isFinished())
+		{
+			dlg.setValue(dlg.maximum());
+			t.stop();
+		}
+	});
+	QObject::connect(this->m_rakuten, &rakuten_client::signal_IchibaItemSearchFinished, this, [this](bool success)
+	{
+		if (!success)
+		{
+			// ...
+		}
+	});
+	QObject::connect(this->m_rakuten, &rakuten_client::queuedItemSearch, &dlg, &MyProgressDlg::addTask);
+	QObject::connect(this->m_rakuten, &rakuten_client::signal_itemSearchFinished, &dlg, [this, &dlg](const QString& itemUrl)
+	{
+		if (!this->m_rakuten->isFinished())
+		{
+			const int newval = qMin<>(dlg.value() + 1, dlg.maximum() - 1);
+			dlg.setValue(newval);
+		}
+	});
+
+
+	// start
+	t.start(1000);
+	dlg.exec();
+}
+void MainWindow::gen_png()
+{
+	if (this->m_imgTimerId != 0)
+	{
+		// cannot start
+		QMessageBox::warning(this, QString(), from_u8(u8"現在画像を生成中です。"));
+		return;
+	}
+
+	QList<QPair<QString, int>> items = this->m_rakutenItemModel->get_ranking_items(this->m_shopCodeEdit->text());
+	if (items.isEmpty())
+	{
+		// getorder first
+		QMessageBox::warning(this, QString(), from_u8(u8"先に注文を取得してください。"));
+		return;
+	}
+
+	int i = 0;
+	for (const auto& pair : items)
+	{
+		this->m_rakuten->queue_item_search(pair.first, true);
+		if (++i >= 20)
+		{
+			// 30max
+			break;
+		}
+	}
+
+	// run event loop
+	MyProgressDlg dlg(this);
+	dlg.setLabelText(from_u8(u8"商品の詳細情報を取得しています..."));
+	dlg.setCancelButtonText(from_u8(u8"取消"));
+	dlg.setValue(0);
+	dlg.setRange(0, 1);
+	dlg.setWindowModality(Qt::WindowModal);
+
+	QTimer t;
+	QObject::connect(&t, &QTimer::timeout, &dlg, [this, &t, &dlg]()
+	{
+		if (m_rakuten->isFinished())
+		{
+			dlg.close();
+			t.stop();
+		}
+	});
+	t.start(1000);
+	dlg.exec();
+
+
+	this->m_rank_mode = true;
+	this->m_rankIndex = 0;
+	this->m_rankItems = this->m_rakutenItemModel->get_ranking_items2(this->m_shopCodeEdit->text());
+
+	const QString html = gen_rank_item_row(m_rankItems, 1, this->m_saveDir.filePath("ranking_generated.html"));
+	if (!html.isEmpty())
+	{
+		this->renderDiv(html);
+	}
+}
+void MainWindow::gen_html()
+{
+	if (this->m_imgTimerId != 0)
+	{
+		// cannot start
+		QMessageBox::warning(this, QString(), from_u8(u8"現在画像を生成中です。"));
+		return;
+	}
+
+	auto ranking_items = this->m_rakutenItemModel->get_ranking_items2(this->m_shopCodeEdit->text());
+	auto new_items = this->m_rakutenItemModel->new_items(this->m_shopCodeEdit->text());
+
+	qApp->clipboard()->setText(
+		gen_entire_html(new_items, ranking_items, this->m_saveDir,
+			this->m_shopCodeEdit->text(), 
+			this->m_ftpRelativePathEdit->text() + "/n", 
+			this->m_ftpRelativePathEdit->text() + "/r")
+	);
+
+	QFile f_in(this->m_saveDir.filePath(ENTIRE_HTML_FILENAME));
+	if (f_in.open(QIODevice::ReadOnly))
+	{
+		this->m_viewForSave->setHtml(f_in.readAll());
+	}
+
+	QMessageBox::information(this, QString(), from_u8(u8"クリップボードにコピーしました。"));
+}
+
+
+
 void MainWindow::async_saveRankItemImages()
 {
 	this->m_viewForSave->page()->runJavaScript(R"(document.querySelector('table').clientHeight)", [this](const QVariant& v)
@@ -466,7 +590,7 @@ void MainWindow::async_saveRankItemImages()
 		const int clientHeight = v.toInt();
 		const int clientWidth = CLIENT_WIDTH;
 
-		const QDir rankingDir = openSubDir(this->m_saveDir, "ranking");
+		const QDir rankingDir = openSubDir(this->m_saveDir, "r");
 
 		// save as jpg
 		if (!this->m_rankItems.isEmpty())
@@ -508,10 +632,10 @@ void MainWindow::async_saveRankItemImages()
 			this->m_rank_mode = false;
 			this->m_newIndex = 0;
 
-			const QDir newitemDir = openSubDir(this->m_saveDir, "newitem");
+			const QDir newitemDir = openSubDir(this->m_saveDir, "n");
 			this->m_newItems = this->m_rakutenItemModel->new_items(this->m_shopCodeEdit->text());
 
-			if (!use_svg)
+			if constexpr (!use_svg)
 			{
 				const QString html = gen_new_item_row(m_newItems, this->m_saveDir.filePath("new_item_row.html"));
 				if (!html.isEmpty())
@@ -538,7 +662,7 @@ void MainWindow::async_saveNewItemImages()
 	{
 		const int clientHeight = v.toInt();
 		const int clientWidth = CLIENT_WIDTH;
-		const QDir newitemDir = openSubDir(this->m_saveDir, "newitem");
+		const QDir newitemDir = openSubDir(this->m_saveDir, "n");
 
 		// save as jpg
 		if (!this->m_newItems.isEmpty())
