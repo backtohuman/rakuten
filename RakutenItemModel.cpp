@@ -285,10 +285,15 @@ void RakutenItemModel::addItem(const QString& shopCode, item::search::item_ptr i
 
 QList<QPair<QString, int>> RakutenItemModel::get_ranking_items(const QString& shopCode)
 {
-	const QDateTime _30daysb4 = QDateTime::currentDateTime().addDays(-30);
 	QList<QPair<QString, int>> items;
+	if (!m_allItems.contains(shopCode))
+	{
+		return items;
+	}
+
 
 	// íçï∂âÒêîÇranking_mapÇ…éÊìæ
+	const QDateTime _30daysb4 = QDateTime::currentDateTime().addDays(-30);
 	std::unordered_map<QString, int> ranking_map;
 	for (const auto order : this->m_orders)
 	{
@@ -297,11 +302,19 @@ QList<QPair<QString, int>> RakutenItemModel::get_ranking_items(const QString& sh
 
 		for (const auto item : order->items)
 		{
-			ranking_map[item->manageNumber] += item->units;
+			constexpr bool by_price = false;
+			if constexpr (!by_price)
+			{
+				ranking_map[item->manageNumber] += item->units;
+			}
+			else
+			{
+				ranking_map[item->manageNumber] += (item->price * item->units);
+			}
 		}
 	}
 
-	// map > vector
+	// map > list
 	for (const auto& pair : ranking_map)
 	{
 		items.push_back({ pair.first, pair.second });
@@ -318,40 +331,14 @@ QList<QPair<QString, int>> RakutenItemModel::get_ranking_items(const QString& sh
 
 QVector<item::search::item_ptr> RakutenItemModel::get_ranking_items2(const QString& shopCode)
 {
-	const int ranking_max_size = 3 * 3;
 	QVector<item::search::item_ptr> _items;
 	if (!m_allItems.contains(shopCode))
 	{
 		return _items;
 	}
 
-	const QDateTime _30daysb4 = QDateTime::currentDateTime().addDays(-30);
-	std::unordered_map<QString, int> ranking_map;
-	for (const auto order : this->m_orders)
-	{
-		if (order->orderDatetime < _30daysb4)
-			continue;
-
-		for (const auto item : order->items)
-		{
-			ranking_map[item->manageNumber] += item->units;
-		}
-	}
-
-	QList <QPair<QString, int>> v;
-	for (const auto& pair : ranking_map)
-	{
-		v.push_back({ pair.first, pair.second });
-	}
-
-	qSort(v.begin(), v.end(), [](const QPair<QString, int>& a, const QPair<QString, int>& b)
-	{
-		return a.second > b.second;
-	});
-
-
 	bool _done = false;
-	for (const auto& pair : v)
+	for (const auto& pair : this->get_ranking_items(shopCode))
 	{
 		if (_done)
 			break;
@@ -362,7 +349,7 @@ QVector<item::search::item_ptr> RakutenItemModel::get_ranking_items2(const QStri
 			{
 				qDebug() << item->itemUrl << item->images[0];
 				_items.push_back(item);
-				if (ranking_max_size <= _items.size())
+				if (RANK_ITEM_MAX_SIZE <= _items.size())
 				{
 					// break the main loop
 					_done = true;
@@ -373,9 +360,9 @@ QVector<item::search::item_ptr> RakutenItemModel::get_ranking_items2(const QStri
 		}
 	}
 
-	if (_items.size() > ranking_max_size)
+	if (_items.size() > RANK_ITEM_MAX_SIZE)
 	{
-		_items.resize(ranking_max_size);
+		_items.resize(RANK_ITEM_MAX_SIZE);
 	}
 	return _items;
 }
@@ -389,16 +376,17 @@ QVector<item::search::item_ptr> RakutenItemModel::new_items(const QString& shopC
 	}
 
 	// sort by registDate
-	_items = this->m_items.toVector();
-	qSort(_items.begin(), _items.end(), [](const item::search::item_ptr& a, const item::search::item_ptr& b)
+	auto _copy = this->m_items;
+	qSort(_copy.begin(), _copy.end(), [](const item::search::item_ptr& a, const item::search::item_ptr& b)
 	{
 		return a->registDate > b->registDate;
 	});
 
-	const int newitem_max_size = 3 * 3;
-	if (_items.size() > newitem_max_size)
+	const int len = qMin<>(_copy.size(), NEW_ITEM_MAX_SIZE);
+	for (int i = 0; i < len; i++)
 	{
-		_items.resize(newitem_max_size);
+		_items.push_back(_copy[i]);
 	}
+
 	return _items;
 }

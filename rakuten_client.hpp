@@ -1,8 +1,5 @@
 #pragma once
 
-
-#define CLIENT_WIDTH (111)
-
 // https://webservice.rms.rakuten.co.jp/merchant-portal/view/ja/common/1-1_service_index/functionsCommonDefinition
 struct APIResponseStatus
 {

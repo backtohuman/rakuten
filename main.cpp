@@ -1,11 +1,6 @@
 #include "stdafx.h"
 
 #include "MainWindow.hpp"
-#include "qt_helper.hpp"
-
-#include <qfont.h>
-#include <qsvggenerator.h>
-
 
 int main(int argc, char *argv[])
 {
@@ -17,8 +12,6 @@ int main(int argc, char *argv[])
     QApplication app(argc, argv);
 	MainWindow w;
 	w.show();
-
-	//classfs();
 
     return app.exec();
 }

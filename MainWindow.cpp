@@ -30,11 +30,11 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
 	// view
 	this->m_rakutenItemView = new QTableView(this);
 	this->m_rakutenItemModel = new RakutenItemModel(this->m_rakutenItemView);
-	m_rakutenProxyModel = new QSortFilterProxyModel(this->m_rakutenItemView);
-	m_rakutenProxyModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
-	m_rakutenProxyModel->setSourceModel(m_rakutenItemModel);
-	m_rakutenProxyModel->setSortRole(SortRole);
-	m_rakutenProxyModel->setFilterKeyColumn(-1); // If the value is -1, the keys will be read from all columns.
+	this->m_rakutenProxyModel = new QSortFilterProxyModel(this->m_rakutenItemView);
+	this->m_rakutenProxyModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
+	this->m_rakutenProxyModel->setSourceModel(m_rakutenItemModel);
+	this->m_rakutenProxyModel->setSortRole(SortRole);
+	this->m_rakutenProxyModel->setFilterKeyColumn(-1); // If the value is -1, the keys will be read from all columns.
 	this->m_rakutenItemView->setModel(m_rakutenProxyModel);
 	this->m_rakutenItemView->setSelectionBehavior(QAbstractItemView::SelectRows);
 	this->m_rakutenItemView->setSortingEnabled(true);
@@ -300,7 +300,7 @@ void MainWindow::renderDiv(const QString& html)
 {
 	if (this->m_imgTimerId == 0)
 	{
-		this->m_viewForSave->setHtml(html);
+		this->m_viewForSave->setHtml(html, QUrl::fromLocalFile(this->m_saveDir.absolutePath() + '/'));
 		this->m_imgTimerId = this->startTimer(1000);
 	}
 }
@@ -517,7 +517,7 @@ void MainWindow::gen_png()
 		this->m_rakuten->queue_item_search(pair.first, true);
 		if (++i >= 20)
 		{
-			// 30max
+			// 20max
 			break;
 		}
 	}
@@ -572,6 +572,7 @@ void MainWindow::gen_html()
 			this->m_ftpRelativePathEdit->text() + "/r")
 	);
 
+	// update view for user experience
 	QFile f_in(this->m_saveDir.filePath(ENTIRE_HTML_FILENAME));
 	if (f_in.open(QIODevice::ReadOnly))
 	{

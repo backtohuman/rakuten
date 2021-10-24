@@ -43,27 +43,23 @@ QString gen_new_item_row(const QVector<item::search::item_ptr>& new_items, const
         margin: 0px;
         padding: 0px;
     }
-
     table {
         border-collapse: collapse;
     }
-
     .img {
-        width: 111px;
+        width: 108px;
     }
-
     .date {
-        width: 111px;
+        width: 108px;
         padding: 3px 0px;
         color: white;
         font-size: 12px;
         background: #d34e6f;
         text-align: center;
     }
-
     .name {
-		max-width: 111px;
-        width: 111px;
+		max-width: 108px;
+        width: 108px;
         height: 70px;
         word-wrap: break-word;
         color: #333;
@@ -76,9 +72,8 @@ QString gen_new_item_row(const QVector<item::search::item_ptr>& new_items, const
         text-overflow: ellipsis;
         padding: 5px 0px;
     }
-
     .price {
-        width: 111px;
+        width: 108px;
         margin-top: 5px;
         color: #bf0000;
         font-size: 13px;
@@ -219,15 +214,15 @@ QString gen_rank_item_row(const QVector<item::search::item_ptr>& new_items, int 
         border-collapse: collapse;
     }
     .item {
-        width: 111px;
+        width: 108px;
         font-family: 'Meiryo,Hiragino Kaku Gothic ProN,MS PGothic,sans-serif';
         display: inline-block;
     }
     .img {
-        width: 111px;
+        width: 108px;
     }
     .rank {
-        background-image: url('https://www.rakuten.ne.jp/gold/kstar/ectool/rrank/shared_resource/rankimg_3-4.jpg');
+        background-image: url('./rankimg_3-4.jpg');
         -moz-background-size: 100% auto;
         background-size: 100% auto;
         height:29px;
@@ -239,7 +234,7 @@ QString gen_rank_item_row(const QVector<item::search::item_ptr>& new_items, int 
         vertical-align:baseline;
     }
     .date {
-        width: 111px;
+        width: 108px;
         padding: 3px 0px;
         color: white;
         font-size: 12px;
@@ -247,7 +242,7 @@ QString gen_rank_item_row(const QVector<item::search::item_ptr>& new_items, int 
         text-align: center;
     }
     .name {
-        width: 111px;
+        width: 108px;
         height: 70px;
         word-wrap: break-word;
         color: #333;
@@ -261,7 +256,7 @@ QString gen_rank_item_row(const QVector<item::search::item_ptr>& new_items, int 
         padding: 5px 0px;
     }
     .price {
-        width: 111px;
+        width: 108px;
         margin-top: 5px;
         color: #bf0000;
         font-size: 13px;
@@ -272,7 +267,7 @@ QString gen_rank_item_row(const QVector<item::search::item_ptr>& new_items, int 
 )");
 
 	QXmlStreamWriter stream(&f_out);
-	stream.setAutoFormatting(false);
+	stream.setAutoFormatting(true);
 
 	// <table>
 	stream.writeStartElement("table");
@@ -295,19 +290,19 @@ QString gen_rank_item_row(const QVector<item::search::item_ptr>& new_items, int 
 			if (rank == 1)
 			{
 				stream.writeEmptyElement("img");
-				stream.writeAttribute("src", "https://www.rakuten.ne.jp/gold/kstar/ectool/rrank/shared_resource/rankimg_3-1.jpg");
+				stream.writeAttribute("src", "./rankimg_3-1.jpg");
 				stream.writeAttribute("width", QString::number(CLIENT_WIDTH));
 			}
 			else if (rank == 2)
 			{
 				stream.writeEmptyElement("img");
-				stream.writeAttribute("src", "https://www.rakuten.ne.jp/gold/kstar/ectool/rrank/shared_resource/rankimg_3-2.jpg");
+				stream.writeAttribute("src", "./rankimg_3-2.jpg");
 				stream.writeAttribute("width", QString::number(CLIENT_WIDTH));
 			}
 			else if (rank == 3)
 			{
 				stream.writeEmptyElement("img");
-				stream.writeAttribute("src", "https://www.rakuten.ne.jp/gold/kstar/ectool/rrank/shared_resource/rankimg_3-3.jpg");
+				stream.writeAttribute("src", "./rankimg_3-3.jpg");
 				stream.writeAttribute("width", QString::number(CLIENT_WIDTH));
 			}
 			else
