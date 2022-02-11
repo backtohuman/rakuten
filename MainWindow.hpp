@@ -14,6 +14,8 @@ public:
 	MainWindow(QWidget* parent = nullptr);
 	~MainWindow();
 
+	QString getShopCode() const;
+
 protected:
 	void closeEvent(QCloseEvent* event) override;
 	void timerEvent(QTimerEvent* event) override;
@@ -45,6 +47,7 @@ private slots:
 	void newitems();
 	void gen_png();
 	void gen_html();
+	void upload_pngs();
 
 private:
 	void async_saveRankItemImages();
@@ -82,7 +85,9 @@ private:
 
 	// settings
 	QLineEdit* m_applicationIdEdit, *m_serviceSecretEdit, * m_licenseKeyEdit, *m_shopCodeEdit,
-		*m_ftpRelativePathEdit;
+
+		// ftp
+		*m_ftpUserEdit, *m_ftpPasswordEdit, *m_ftpRelativePathEdit;
 
 
 	//

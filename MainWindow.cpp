@@ -7,6 +7,8 @@
 #include "RakutenItemModel.hpp"
 #include "settings.hpp"
 #include "MyProgressDlg.hpp"
+#include "RakutenFtp.hpp"
+
 
 extern QString gen_new_item_row(const QVector<item::search::item_ptr>& new_items, const QString& filepath);
 extern QString gen_rank_item_row(const QVector<item::search::item_ptr>& new_items, int rank_start, const QString& filepath);
@@ -73,6 +75,12 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
 }
 MainWindow::~MainWindow()
 {
+}
+
+
+QString MainWindow::getShopCode() const
+{
+	return this->m_shopCodeEdit->text();
 }
 
 
@@ -173,6 +181,7 @@ QWidget* MainWindow::_createMainTab()
 	QPushButton* genBtn = new QPushButton(from_u8(u8"画像生成"));
 	QPushButton* genFinalBtn = new QPushButton(from_u8(u8"HTML生成"));
 	QPushButton* openFolderBtn = new QPushButton(from_u8(u8"フォルダを開く"));
+	QPushButton* uploadBtn = new QPushButton(from_u8(u8"アップロード(experimental)"));
 
 	// ranking
 	QObject::connect(getOrderBtn, &QPushButton::clicked, this, &MainWindow::get_orders);
@@ -188,6 +197,7 @@ QWidget* MainWindow::_createMainTab()
 	{
 		QDesktopServices::openUrl(QUrl::fromLocalFile(this->m_saveDir.absolutePath()));
 	});
+	QObject::connect(uploadBtn, &QPushButton::clicked, this, &MainWindow::upload_pngs);
 
 	QHBoxLayout* layout = new QHBoxLayout;
 	layout->addWidget(getOrderBtn);
@@ -195,6 +205,7 @@ QWidget* MainWindow::_createMainTab()
 	layout->addWidget(genBtn);
 	layout->addWidget(genFinalBtn);
 	layout->addWidget(openFolderBtn);
+	layout->addWidget(uploadBtn);
 
 	QWidget* widget = new QWidget(this);
 	widget->setLayout(layout);
@@ -258,6 +269,8 @@ QWidget* MainWindow::_createSettingsTab()
 	this->m_serviceSecretEdit = new QLineEdit(widget);
 	this->m_licenseKeyEdit = new QLineEdit(widget);
 	this->m_shopCodeEdit = new QLineEdit(widget);
+	this->m_ftpUserEdit = new QLineEdit(widget);
+	this->m_ftpPasswordEdit = new QLineEdit(widget);
 	this->m_ftpRelativePathEdit = new QLineEdit(widget);
 
 	QObject::connect(m_applicationIdEdit, &QLineEdit::textChanged, this, [this](const QString& text)
@@ -275,11 +288,20 @@ QWidget* MainWindow::_createSettingsTab()
 	QObject::connect(m_shopCodeEdit, &QLineEdit::textChanged, this, [this](const QString& text)
 	{
 		this->m_rakuten->setShopCode(text);
-		this->m_rakuten;
 	});
-	QObject::connect(m_ftpRelativePathEdit, &QLineEdit::textChanged, this, [this](const QString& text)
+	QObject::connect(m_ftpUserEdit, &QLineEdit::textChanged, this, [this](const QString& text)
 	{
-		// hmmm
+	});
+	QObject::connect(m_ftpPasswordEdit, &QLineEdit::textChanged, this, [this](const QString& text)
+	{
+	});
+	QObject::connect(m_ftpRelativePathEdit, &QLineEdit::textEdited, this, [this](const QString& text)
+	{
+		// normalize
+		QString _text = text;
+		_text.replace('\\', '/');
+
+		qobject_cast<QLineEdit*>(this->sender())->setText(_text);
 	});
 
 
@@ -288,6 +310,8 @@ QWidget* MainWindow::_createSettingsTab()
 	layout->addRow("serviceSecret: ", m_serviceSecretEdit);
 	layout->addRow("licenseKey: ", m_licenseKeyEdit);
 	layout->addRow("shopCode: ", m_shopCodeEdit);
+	layout->addRow("ftp user: ", m_ftpUserEdit);
+	layout->addRow("ftp password: ", m_ftpPasswordEdit);
 	layout->addRow(from_u8(u8"ftp上の使用するフォルダ名: "), m_ftpRelativePathEdit);
 	widget->setLayout(layout);
 
@@ -335,6 +359,10 @@ void MainWindow::loadSettings(QSettings& settings)
 	this->m_shopCodeEdit->setText(settings.value("shopCode").toByteArray());
 	settings.endGroup();
 
+	// ftp settings
+	this->m_ftpUserEdit->setText(settings.value("ftpuser").toString());
+	this->m_ftpPasswordEdit->setText(settings.value("ftppass").toString());
+
 	const QVariant var = settings.value("ftpRelativePath");
 	if (var.isValid())
 		this->m_ftpRelativePathEdit->setText(var.toString());
@@ -369,6 +397,9 @@ void MainWindow::saveSettings(QSettings& settings)
 	settings.setValue("shopCode", this->m_shopCodeEdit->text());
 	settings.endGroup();
 
+	// ftp
+	settings.setValue("ftpuser", this->m_ftpUserEdit->text());
+	settings.setValue("ftppass", this->m_ftpPasswordEdit->text());
 	settings.setValue("ftpRelativePath", this->m_ftpRelativePathEdit->text());
 }
 
@@ -503,7 +534,7 @@ void MainWindow::gen_png()
 		return;
 	}
 
-	QList<QPair<QString, int>> items = this->m_rakutenItemModel->get_ranking_items(this->m_shopCodeEdit->text());
+	const QList<QPair<QString, int>> items = this->m_rakutenItemModel->getItemsSortedByUnits(this->getShopCode());
 	if (items.isEmpty())
 	{
 		// getorder first
@@ -511,16 +542,6 @@ void MainWindow::gen_png()
 		return;
 	}
 
-	int i = 0;
-	for (const auto& pair : items)
-	{
-		this->m_rakuten->queue_item_search(pair.first, true);
-		if (++i >= 20)
-		{
-			// 20max
-			break;
-		}
-	}
 
 	// run event loop
 	MyProgressDlg dlg(this);
@@ -535,17 +556,41 @@ void MainWindow::gen_png()
 	{
 		if (m_rakuten->isFinished())
 		{
+			dlg.setValue(dlg.maximum());
 			dlg.close();
 			t.stop();
 		}
 	});
+	QObject::connect(this->m_rakuten, &rakuten_client::queuedItemSearch, &dlg, &MyProgressDlg::addTask);
+	QObject::connect(this->m_rakuten, &rakuten_client::signal_itemSearchFinished, &dlg, [this, &dlg](const QString& itemUrl)
+	{
+		if (!this->m_rakuten->isFinished())
+		{
+			const int newval = qMin<>(dlg.value() + 1, dlg.maximum() - 1);
+			dlg.setValue(newval);
+		}
+	});
+
+	// queue
+	int i = 0;
+	for (const auto& pair : items)
+	{
+		this->m_rakuten->queue_item_search(pair.first, true);
+		if (++i >= 20)
+		{
+			// 20max
+			break;
+		}
+	}
+
+	// dialog
 	t.start(1000);
 	dlg.exec();
 
 
 	this->m_rank_mode = true;
 	this->m_rankIndex = 0;
-	this->m_rankItems = this->m_rakutenItemModel->get_ranking_items2(this->m_shopCodeEdit->text());
+	this->m_rankItems = this->m_rakutenItemModel->get_ranking_items2(this->getShopCode());
 
 	const QString html = gen_rank_item_row(m_rankItems, 1, this->m_saveDir.filePath("ranking_generated.html"));
 	if (!html.isEmpty())
@@ -562,14 +607,17 @@ void MainWindow::gen_html()
 		return;
 	}
 
-	auto ranking_items = this->m_rakutenItemModel->get_ranking_items2(this->m_shopCodeEdit->text());
-	auto new_items = this->m_rakutenItemModel->new_items(this->m_shopCodeEdit->text());
+	//
+	const QString ftpRankPath = this->m_ftpRelativePathEdit->text() + "/r";
+	const QString ftpNewItemPath = this->m_ftpRelativePathEdit->text() + "/n";
+
+	//
+	auto ranking_items = this->m_rakutenItemModel->get_ranking_items2(this->getShopCode());
+	auto new_items = this->m_rakutenItemModel->new_items(this->getShopCode());
 
 	qApp->clipboard()->setText(
 		gen_entire_html(new_items, ranking_items, this->m_saveDir,
-			this->m_shopCodeEdit->text(), 
-			this->m_ftpRelativePathEdit->text() + "/n", 
-			this->m_ftpRelativePathEdit->text() + "/r")
+			this->getShopCode(), ftpNewItemPath, ftpRankPath)
 	);
 
 	// update view for user experience
@@ -581,7 +629,27 @@ void MainWindow::gen_html()
 
 	QMessageBox::information(this, QString(), from_u8(u8"クリップボードにコピーしました。"));
 }
+void MainWindow::upload_pngs()
+{
+	const QDir rankingDir = openSubDir(this->m_saveDir, "r");
+	const QDir newitemDir = openSubDir(this->m_saveDir, "n");
+	const QString ftpRankPath = this->m_ftpRelativePathEdit->text() + "/r";
+	const QString ftpNewItemPath = this->m_ftpRelativePathEdit->text() + "/n";
 
+	RakutenFtp dlg(this);
+	dlg.setLabelText(from_u8(u8"ログインしています..."));
+	dlg.setCancelButtonText(from_u8(u8"取消"));
+	dlg.setValue(0);
+	dlg.setRange(0, 1);
+	dlg.setWindowModality(Qt::WindowModal);
+
+	// act
+	dlg.setRelativePath(this->m_ftpRelativePathEdit->text());
+	dlg.setLocalDirs(newitemDir, rankingDir);
+	dlg.setRemoteDirs(ftpNewItemPath, ftpRankPath);
+	dlg.async_login(this->m_ftpUserEdit->text(), this->m_ftpPasswordEdit->text());
+	dlg.exec();
+}
 
 
 void MainWindow::async_saveRankItemImages()

@@ -35,7 +35,7 @@ public:
 	void addItem(const QString& shopCode, item::search::item_ptr item);
 
 	// generators
-	QList<QPair<QString, int>> get_ranking_items(const QString& shopCode);
+	QList<QPair<QString, int>> getItemsSortedByUnits(const QString& shopCode);
 	QVector<item::search::item_ptr> get_ranking_items2(const QString& shopCode);
 	QVector<item::search::item_ptr> new_items(const QString& shopCode);
 

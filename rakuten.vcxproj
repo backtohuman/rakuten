@@ -58,12 +58,12 @@
   </ItemDefinitionGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|Win32'" Label="QtSettings">
     <QtInstall>msvc2019</QtInstall>
-    <QtModules>core;network;gui;widgets;webenginewidgets</QtModules>
+    <QtModules>core;network;gui;widgets;webenginewidgets;ftp</QtModules>
     <QtBuildConfig>debug</QtBuildConfig>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|Win32'" Label="QtSettings">
     <QtInstall>msvc2019</QtInstall>
-    <QtModules>core;gui;network;svg;webenginewidgets;widgets;xml</QtModules>
+    <QtModules>core;gui;network;svg;webenginewidgets;widgets;xml;ftp</QtModules>
     <QtBuildConfig>release</QtBuildConfig>
   </PropertyGroup>
   <ImportGroup Condition="Exists('$(QtMsBuild)\qt.props')">
@@ -114,14 +114,14 @@
     <QtRcc Include="rakuten.qrc" />
     <QtUic Include="rakuten.ui" />
     <QtMoc Include="MainWindow.hpp" />
-    <ClCompile Include="ftp.cpp" />
+    <ClCompile Include="RakutenFtp.cpp" />
     <ClCompile Include="gen.cpp" />
     <ClCompile Include="MainWindow.cpp" />
     <ClCompile Include="main.cpp" />
     <QtMoc Include="rakuten_client.hpp" />
     <QtMoc Include="RakutenItemModel.hpp" />
     <ClInclude Include="ControlledWebPage.hpp" />
-    <ClInclude Include="ftp.hpp" />
+    <QtMoc Include="RakutenFtp.hpp" />
     <ClInclude Include="qt_helper.hpp" />
     <ClInclude Include="settings.hpp" />
     <ClInclude Include="stdafx.h" />

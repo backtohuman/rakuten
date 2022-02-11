@@ -57,7 +57,7 @@
     <ClCompile Include="stdafx.cpp">
       <Filter>etc</Filter>
     </ClCompile>
-    <ClCompile Include="ftp.cpp">
+    <ClCompile Include="RakutenFtp.cpp">
       <Filter>client</Filter>
     </ClCompile>
     <ClCompile Include="test.cpp">
@@ -80,6 +80,9 @@
     <QtMoc Include="MyProgressDlg.hpp">
       <Filter>ui</Filter>
     </QtMoc>
+    <QtMoc Include="RakutenFtp.hpp">
+      <Filter>ui</Filter>
+    </QtMoc>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stdafx.h">
@@ -90,9 +93,6 @@
     </ClInclude>
     <ClInclude Include="settings.hpp">
       <Filter>etc</Filter>
-    </ClInclude>
-    <ClInclude Include="ftp.hpp">
-      <Filter>client</Filter>
     </ClInclude>
     <ClInclude Include="ControlledWebPage.hpp">
       <Filter>ui</Filter>

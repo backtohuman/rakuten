@@ -283,7 +283,7 @@ void RakutenItemModel::addItem(const QString& shopCode, item::search::item_ptr i
 }
 
 
-QList<QPair<QString, int>> RakutenItemModel::get_ranking_items(const QString& shopCode)
+QList<QPair<QString, int>> RakutenItemModel::getItemsSortedByUnits(const QString& shopCode)
 {
 	QList<QPair<QString, int>> items;
 	if (!m_allItems.contains(shopCode))
@@ -338,7 +338,7 @@ QVector<item::search::item_ptr> RakutenItemModel::get_ranking_items2(const QStri
 	}
 
 	bool _done = false;
-	for (const auto& pair : this->get_ranking_items(shopCode))
+	for (const auto& pair : this->getItemsSortedByUnits(shopCode))
 	{
 		if (_done)
 			break;
